@@ -48,12 +48,38 @@ org_df = normalize_data(org_df, 'Age')
 # 准备数据
 train_feat = prepare_data(org_df)
 
+inertias = []
+for i in range(1, 11):
+    kmeans = KMeans(n_clusters=i, random_state=42)
+    kmeans.fit(train_feat)
+    inertias.append(kmeans.inertia_)
+
+# 识别肘部位置
+deltas = np.diff(inertias)  # 计算每次inertia的变化量
+ddeltas = np.diff(deltas)  # 计算变化量的变化率，即二阶差分
+elbow = np.argmin(ddeltas) + 3
+
+# 绘制肘部图
+plt.figure(figsize=(8, 4))
+plt.plot(range(1, 11), inertias, marker='o')
+plt.plot(elbow, inertias[elbow - 1], 'ro')  # 标记肘部点
+plt.title('Elbow Method')
+plt.xlabel('Number of clusters')
+plt.ylabel('Sum of squared distances')
+plt.annotate('Elbow Point', xy=(elbow, inertias[elbow - 1]), xytext=(elbow, inertias[elbow - 1] + 10000),
+             arrowprops=dict(facecolor='black', shrink=0.05),
+             )
+plt.show()
+
+print(f"The optimal number of clusters is: {elbow}")
+
 # 使用KMeans聚类算法，聚类数为4
-model = KMeans(n_clusters=4)
+model = KMeans(n_clusters=elbow)
 model.fit(train_feat)
+centers = model.cluster_centers_  # 获取聚类中心
 
 # 分别为每个聚类准备数据
-clusters = [train_feat.loc[model.labels_ == i, :] for i in range(4)]
+clusters = [train_feat.loc[model.labels_ == i, :] for i in range(elbow)]
 
 # 为每个聚类指定颜色
 colors = ['red', 'black', 'blue', 'green']
@@ -62,6 +88,9 @@ colors = ['red', 'black', 'blue', 'green']
 plt.figure(figsize=(10, 5))
 for i, cluster in enumerate(clusters):
     plt.scatter(cluster['Income'], cluster['Spending'], color=colors[i], label=f'Cluster {i+1}')
+    # 标示聚类中心
+    plt.scatter(centers[i, train_feat.columns.get_loc('Income')], centers[i, train_feat.columns.get_loc('Spending')],
+                s=200, c='yellow', marker='*', edgecolors='black', label=f'Center {i + 1}')
 plt.title('Income vs Spending for 4 Clusters')
 plt.xlabel('Income')
 plt.ylabel('Spending')
@@ -71,26 +100,15 @@ plt.show()
 plt.figure(figsize=(10, 5))
 for i, cluster in enumerate(clusters):
     plt.scatter(cluster['Income'], cluster['Age'], color=colors[i], label=f'Cluster {i+1}')
+    # 标示聚类中心
+    plt.scatter(centers[i, train_feat.columns.get_loc('Income')], centers[i, train_feat.columns.get_loc('Age')], s=200,
+                c='yellow', marker='*', edgecolors='black', label=f'Center {i + 1}')
 plt.title('Income vs Age for 4 Clusters')
 plt.xlabel('Income')
 plt.ylabel('Age')
 plt.legend()
 plt.show()
 
-
-# 使用肘部方法确定最佳聚类数
-inertias = []
-for i in range(1,11):
-    kmeans = KMeans(n_clusters=i)
-    kmeans.fit(train_feat)
-    inertias.append(kmeans.inertia_)  # 记录每次聚类的总内平方和
-
-# 绘制肘部图
-plt.plot(range(1,11), inertias, marker='o')
-plt.title('Elbow method')
-plt.xlabel('Number of clusters')
-plt.ylabel('Sum of squared distances')
-plt.show()
 
 # 使用层次聚类方法绘制树状图
 linkage_data = linkage(train_feat, method='single', metric='euclidean')
